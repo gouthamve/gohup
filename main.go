@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"os/exec"
@@ -36,11 +37,17 @@ func main() {
 		log.Fatal(err)
 	}
 	go handleSigs(sigs)
+	fmt.Println("Pid of the started process: ", cmd.Process.Pid)
 	cmd.Wait()
+	sendEmail()
 }
 
 func handleSigs(sigs chan os.Signal) {
 	for {
 		<-sigs
 	}
+}
+
+func sendEmail() {
+
 }
