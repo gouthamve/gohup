@@ -24,22 +24,19 @@ func main() {
 	sigs := make(chan os.Signal, 1) // There is a go routine so I think capacity 1 is enough
 	signal.Notify(sigs, syscall.SIGHUP)
 
-	args := os.Args[2:]
+	cmd := exec.Command(path)
+	cmd.Args = os.Args[2:]
 	// WTF is S_IRUSR | S_IWUSR, hoping its 0600
 	logFile, err := os.OpenFile("nohup.out", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0600)
 	if err != nil {
 		log.Fatal("TODO: create it in $HOME")
 	}
-
-	syscall.Dup2(int(logFile.Fd()), 1)
-	syscall.Dup2(int(logFile.Fd()), 2)
-
-	env := os.Environ()
-	execErr := syscall.Exec(path, args, env)
-	if execErr != nil {
-		panic(execErr)
+	cmd.Stdout = logFile
+	if err := cmd.Start(); err != nil {
+		log.Fatal(err)
 	}
 	go handleSigs(sigs)
+	cmd.Wait()
 }
 
 func handleSigs(sigs chan os.Signal) {
