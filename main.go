@@ -3,10 +3,15 @@ package main
 import (
 	"fmt"
 	"log"
+	"net/smtp"
 	"os"
 	"os/exec"
 	"os/signal"
+	"os/user"
+	"strconv"
 	"syscall"
+
+	"github.com/Unknwon/goconfig"
 )
 
 func main() {
@@ -39,7 +44,7 @@ func main() {
 	go handleSigs(sigs)
 	fmt.Println("Pid of the started process: ", cmd.Process.Pid)
 	cmd.Wait()
-	sendEmail()
+	sendEmail(cmd)
 }
 
 func handleSigs(sigs chan os.Signal) {
@@ -48,6 +53,66 @@ func handleSigs(sigs chan os.Signal) {
 	}
 }
 
-func sendEmail() {
+func sendEmail(cmd *exec.Cmd) {
+	curUser, err := user.Current()
+	if err != nil {
+		return
+	}
 
+	cfg, err := goconfig.LoadConfigFile(curUser.HomeDir + "/.nohup")
+	if err != nil {
+		return
+	}
+
+	fromEmail, err := cfg.GetValue("", "fromemail")
+	if err != nil {
+		return
+	}
+
+	toEmail, err := cfg.GetValue("", "toemail")
+	if err != nil {
+		return
+	}
+
+	password, err := cfg.GetValue("", "password")
+	if err != nil {
+		return
+	}
+
+	type EmailConfig struct {
+		Username string
+		Password string
+		Host     string
+		Port     int
+	}
+
+	// authentication configuration
+	smtpHost := "smtp.gmail.com"
+	smtpPort := 587
+	smtpPass := password
+	smtpUser := fromEmail
+
+	emailConf := &EmailConfig{smtpUser, smtpPass, smtpHost, smtpPort}
+
+	emailauth := smtp.PlainAuth("", emailConf.Username, emailConf.Password, emailConf.Host)
+
+	sender := fromEmail // change here
+
+	receivers := []string{
+		toEmail,
+	}
+
+	message := []byte("Your Process, " + cmd.Path + "has stopped") // your message
+
+	// send out the email
+	err = smtp.SendMail(smtpHost+":"+strconv.Itoa(emailConf.Port), //convert port number from int to string
+		emailauth,
+		sender,
+		receivers,
+		message,
+	)
+
+	if err != nil {
+		fmt.Println(err)
+	}
 }
